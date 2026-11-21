@@ -1,106 +1,151 @@
-// HUD: cash, health, wanted stars, mission banner, phone messages, speed,
-// the busted meter, and the minimap with player / police / mission blips.
-import { WORLD_W, WORLD_H, VX, HY, BEACH_Y } from './config.js';
-import { missionBanner, missionTarget } from './missions.js';
+// hud.js — all DOM overlay: cash, health, wanted stars, mission banner,
+// weapon panel, speed, busted bar, crosshair, toast, the full screens
+// (title / pause / busted / wasted) and the canvas MINIMAP with roads,
+// the player arrow, police dots, the mission target and weapon crates.
+import { VX, HZ, BEACH_Z } from './city.js';
+import { WEAPONS } from './weapons.js';
 
-function star(ctx, x, y, r, filled) {
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const rad = i % 2 === 0 ? r : r * 0.45;
-    const a = -Math.PI / 2 + i * Math.PI / 5;
-    const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
-    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+const CSS = `
+#hud { position:fixed; inset:0; pointer-events:none; z-index:5; color:#fff; }
+.pill { background:rgba(10,14,22,0.72); border-radius:10px; padding:8px 14px; }
+#cash { position:absolute; top:14px; left:16px; font-size:30px; font-weight:900; color:#7be495; text-shadow:0 2px 0 #000; }
+#healthWrap { position:absolute; top:56px; left:16px; width:210px; height:14px; background:rgba(10,14,22,0.72); border-radius:7px; overflow:hidden; }
+#healthBar { height:100%; width:100%; background:linear-gradient(90deg,#e23b3b,#ff8a5c); transition:width 0.15s; }
+#banner { position:absolute; top:14px; left:50%; transform:translateX(-50%); font-size:19px; font-weight:800; color:#ffd94d; letter-spacing:0.4px; white-space:nowrap; }
+#toast { position:absolute; top:58px; left:50%; transform:translateX(-50%); font-size:17px; font-weight:700; color:#fff; opacity:0; transition:opacity 0.3s; text-shadow:0 2px 0 #000; }
+#stars { position:absolute; top:12px; right:16px; font-size:30px; letter-spacing:3px; color:#3a4152; text-shadow:0 2px 0 #000; }
+#stars .on { color:#ffd94d; }
+#minimapWrap { position:absolute; top:56px; right:16px; border:2px solid rgba(255,255,255,0.5); border-radius:8px; overflow:hidden; background:#20242c; }
+#minimapCap { position:absolute; top:230px; right:16px; width:220px; text-align:center; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.75); }
+#weapon { position:absolute; right:16px; bottom:16px; text-align:right; }
+#weaponName { font-size:21px; font-weight:900; letter-spacing:1px; text-shadow:0 2px 0 #000; }
+#weaponAmmo { font-size:32px; font-weight:900; text-shadow:0 2px 0 #000; }
+#weaponAmmo small { font-size:17px; color:#c8cfda; }
+#weaponHint { font-size:12px; color:#c8cfda; }
+#speed { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:26px; font-weight:900; text-shadow:0 2px 0 #000; }
+#hint { position:absolute; left:16px; bottom:16px; font-size:12.5px; color:rgba(255,255,255,0.85); text-shadow:0 1px 0 #000; line-height:1.5; }
+#cross { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px; color:rgba(255,255,255,0.9); text-shadow:0 0 4px #000; }
+#bustedWrap { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); width:300px; text-align:center; font-weight:900; color:#ff5964; letter-spacing:2px; }
+#bustedBarBg { height:12px; background:rgba(10,14,22,0.75); border-radius:6px; overflow:hidden; margin-top:4px; }
+#bustedBar { height:100%; width:0%; background:#ff5964; }
+.screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(8,10,18,0.62); z-index:9; color:#fff; text-align:center; pointer-events:auto; }
+.screen h1 { font-size:64px; margin:0 0 4px; color:#ffd94d; text-shadow:0 4px 0 #b3541e, 0 8px 24px #000; letter-spacing:2px; }
+.screen h2 { font-size:40px; margin:0 0 8px; color:#ff5964; text-shadow:0 3px 0 #000; }
+.screen p { max-width:560px; font-size:16.5px; line-height:1.55; color:#e8ecf4; margin:6px 0; }
+.screen .btn { margin-top:18px; background:#ffd94d; color:#221a08; border:none; font-size:20px; font-weight:900; padding:13px 34px; border-radius:10px; cursor:pointer; letter-spacing:1px; }
+.screen .btn:hover { background:#ffe27a; }
+.screen .keys { font-size:13.5px; color:#aeb8c8; line-height:1.7; }
+`;
+
+export function createHud() {
+  const style = document.createElement('style');
+  style.textContent = CSS;
+  document.head.appendChild(style);
+  const root = document.createElement('div');
+  root.id = 'hud';
+  root.innerHTML = `
+    <div id="cash">$0</div>
+    <div id="healthWrap"><div id="healthBar"></div></div>
+    <div id="banner" class="pill"></div>
+    <div id="toast"></div>
+    <div id="stars"></div>
+    <div id="minimapWrap"><canvas id="minimap" width="220" height="168"></canvas></div>
+    <div id="minimapCap">S O L M A R A</div>
+    <div id="weapon"><div id="weaponName"></div><div id="weaponAmmo"></div><div id="weaponHint">1-5 / wheel switch · R reload</div></div>
+    <div id="speed"></div>
+    <div id="hint">WASD move · E car · SHIFT sprint · mouse shoot<br>P pause · M mute · H horn</div>
+    <div id="cross">+</div>
+    <div id="bustedWrap" style="display:none">BUSTED?<div id="bustedBarBg"><div id="bustedBar"></div></div></div>`;
+  document.body.appendChild(root);
+  const el = (id) => root.querySelector('#' + id);
+  const screens = {};
+  function makeScreen(id, html) {
+    const s = document.createElement('div');
+    s.className = 'screen'; s.id = id; s.innerHTML = html; s.style.display = 'none';
+    document.body.appendChild(s);
+    screens[id] = s;
+    return s;
   }
-  ctx.closePath();
-  ctx.fillStyle = filled ? '#ffd23f' : 'rgba(255,255,255,0.18)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.stroke();
-}
-export function drawMinimap(ctx, g, x, y, w, h) {
-  const sx = w / WORLD_W, sy = h / WORLD_H;
-  ctx.fillStyle = 'rgba(16,18,28,0.82)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.stroke();
-  ctx.fillStyle = '#2b7f9e'; ctx.fillRect(x, y + BEACH_Y * sy + (1650 - BEACH_Y) * sy * 0, w, 0); // placeholder no-op
-  ctx.fillStyle = '#166a8c'; ctx.fillRect(x, y + 1650 * sy, w, h - 1650 * sy);
-  ctx.fillStyle = '#ecd28f'; ctx.fillRect(x, y + BEACH_Y * sy, w, (1650 - BEACH_Y) * sy);
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
-  for (const cx of VX) { ctx.beginPath(); ctx.moveTo(x + cx * sx, y); ctx.lineTo(x + cx * sx, y + h); ctx.stroke(); }
-  for (const cy of HY) { ctx.beginPath(); ctx.moveTo(x, y + cy * sy); ctx.lineTo(x + w, y + cy * sy); ctx.stroke(); }
-  const tgt = missionTarget(g);
-  if (tgt) {
-    ctx.fillStyle = '#ffd23f';
-    ctx.beginPath(); ctx.arc(x + tgt.x * sx, y + tgt.y * sy, 4.5 + Math.sin(g.time * 5) * 1.2, 0, Math.PI * 2); ctx.fill();
+  makeScreen('scr-title', `
+    <h1>SOLMARA HEAT 3D</h1>
+    <p><b>ARSENAL EDITION.</b> Fixer Mara Voss has work: steal the gold car, run her
+    checkpoints, and lose the heat in the sun-soaked streets of Solmara. Five weapons,
+    one city, zero patience from the police.</p>
+    <button class="btn" id="btn-start">START ENGINE</button>
+    <p class="keys">WASD move · SHIFT sprint · E enter/exit car · mouse aim &amp; shoot · 1–5 / wheel weapons · R reload<br>
+    Right-mouse with the RIFLE zooms · P pause · M mute · H horn</p>`);
+  makeScreen('scr-pause', `<h2>PAUSED</h2><p>Solmara waits for no one. Well — just this once.</p><button class="btn" id="btn-resume">BACK TO THE STREETS</button>`);
+  makeScreen('scr-busted', `<h2>BUSTED</h2><p id="bustedText">The police walk you to the station.</p><button class="btn" id="btn-busted">PAY &amp; WALK FREE</button>`);
+  makeScreen('scr-wasted', `<h2>WASTED</h2><p>The clinic patches you up and sends the bill.</p><button class="btn" id="btn-wasted">LEAVE CLINIC (−$200)</button>`);
+
+  const mm = el('minimap').getContext('2d');
+  let toastTimer = 0;
+  const H = {
+    root, screens,
+    onStart: null, onResume: null, onBusted: null, onWasted: null,
+    show(name) {
+      for (const k of Object.keys(screens)) screens[k].style.display = k === name ? 'flex' : 'none';
+    },
+    hideScreens() { H.show(null); },
+    toast(msg) { el('toast').textContent = msg; el('toast').style.opacity = 1; toastTimer = 2.6; },
+    update(dt, G) {
+      toastTimer -= dt;
+      if (toastTimer <= 0) el('toast').style.opacity = 0;
+      el('cash').textContent = '$' + G.cash;
+      el('healthBar').style.width = Math.max(0, G.player.health) + '%';
+      el('banner').textContent = G.missions.banner();
+      let stars = '';
+      for (let i = 0; i < 5; i++) stars += `<span class="${i < G.police.wanted ? 'on' : ''}">★</span>`;
+      el('stars').innerHTML = stars;
+      const W = G.weapons, def = WEAPONS[W.current], st = W.state[W.current];
+      el('weaponName').textContent = def.name + (W.reloadT > 0 ? ' — RELOADING…' : '');
+      el('weaponAmmo').innerHTML = def.mag === Infinity ? '∞' :
+        `${st.mag} <small>/ ${st.reserve === Infinity ? '∞' : st.reserve}</small>`;
+      el('weapon').style.display = G.player.inCar ? 'none' : 'block';
+      el('cross').style.display = (!G.player.inCar && G.state === 'playing' && W.current !== 'fists') ? 'block' : 'none';
+      el('speed').textContent = G.player.inCar ? Math.round(Math.abs(G.player.inCar.speed) * 2.4) + ' km/h' : '';
+      const bm = G.police.bustedMeter;
+      el('bustedWrap').style.display = bm > 0.02 ? 'block' : 'none';
+      el('bustedBar').style.width = (bm * 100) + '%';
+      drawMinimap(G);
+    },
+  };
+  document.querySelector('#btn-start').addEventListener('click', () => H.onStart && H.onStart());
+  document.querySelector('#btn-resume').addEventListener('click', () => H.onResume && H.onResume());
+  document.querySelector('#btn-busted').addEventListener('click', () => H.onBusted && H.onBusted());
+  document.querySelector('#btn-wasted').addEventListener('click', () => H.onWasted && H.onWasted());
+
+  function drawMinimap(G) {
+    const W = 220, Hh = 168;
+    const sx = (x) => (x + 660) / 1320 * W;
+    const sz = (z) => (z + 520) / 1240 * Hh;
+    mm.fillStyle = '#262b33'; mm.fillRect(0, 0, W, Hh);
+    mm.fillStyle = '#f2dfa0'; mm.fillRect(0, sz(BEACH_Z), W, sz(566) - sz(BEACH_Z));
+    mm.fillStyle = '#2e9fc4'; mm.fillRect(0, sz(566), W, Hh - sz(566));
+    mm.strokeStyle = '#4a5058'; mm.lineWidth = 3;
+    for (const rx of VX) { mm.beginPath(); mm.moveTo(sx(rx), sz(-500)); mm.lineTo(sx(rx), sz(BEACH_Z)); mm.stroke(); }
+    for (const rz of HZ) { mm.beginPath(); mm.moveTo(sx(-640), sz(rz)); mm.lineTo(sx(640), sz(rz)); mm.stroke(); }
+    // weapon crates
+    mm.fillStyle = '#ff9f1c';
+    for (const pk of G.weapons.pickups) if (pk.kind === 'crate' && pk.active) mm.fillRect(sx(pk.mesh.position.x) - 2, sz(pk.mesh.position.z) - 2, 4, 4);
+    // mission target
+    const t = G.missions.target();
+    if (t) {
+      mm.fillStyle = '#ffd94d';
+      mm.beginPath(); mm.arc(sx(t.x), sz(t.z), 4 + Math.sin(G.time * 5) * 1.2, 0, 6.29); mm.fill();
+    }
+    // police
+    mm.fillStyle = '#ff4040';
+    for (const c of G.police.cars) if (c.active) { mm.beginPath(); mm.arc(sx(c.car.pos.x), sz(c.car.pos.z), 3, 0, 6.29); mm.fill(); }
+    // player arrow
+    const px = sx(G.player.pos.x), pz = sz(G.player.pos.z);
+    const ang = G.player.inCar ? G.player.inCar.angle : G.player.angle;
+    mm.save();
+    mm.translate(px, pz);
+    mm.rotate(Math.PI - ang);
+    mm.fillStyle = '#ffffff';
+    mm.beginPath(); mm.moveTo(0, -6); mm.lineTo(4, 5); mm.lineTo(-4, 5); mm.closePath(); mm.fill();
+    mm.restore();
   }
-  for (const c of g.cops) {
-    if (c.dead) continue;
-    ctx.fillStyle = Math.sin(g.time * 10) > 0 ? '#ff3b30' : '#3b82f6';
-    ctx.beginPath(); ctx.arc(x + c.x * sx, y + c.y * sy, 3, 0, Math.PI * 2); ctx.fill();
-  }
-  const p = g.player;
-  ctx.save(); ctx.translate(x + p.x * sx, y + p.y * sy); ctx.rotate(p.angle);
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
-export function drawHUD(ctx, g, vw, vh) {
-  ctx.textAlign = 'left';
-  // Cash + health, top-left.
-  ctx.fillStyle = 'rgba(10,10,18,0.55)'; ctx.beginPath(); ctx.roundRect(14, 12, 208, 58, 8); ctx.fill();
-  ctx.fillStyle = '#7ee787'; ctx.font = 'bold 22px system-ui';
-  ctx.fillText('$' + g.cash.toLocaleString('en-US'), 26, 38);
-  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(26, 48, 180, 10);
-  ctx.fillStyle = g.health > 30 ? '#4ade80' : '#f87171'; ctx.fillRect(26, 48, 180 * Math.max(0, g.health) / 100, 10);
-  // Wanted stars, top-right.
-  for (let i = 0; i < 5; i++) star(ctx, vw - 34 - i * 34, 32, 13, i < g.wanted);
-  if (g.wanted > 0 && !g.playerSeen) {
-    ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = '13px system-ui'; ctx.textAlign = 'right';
-    ctx.fillText('laying low…', vw - 20, 62); ctx.textAlign = 'left';
-  }
-  drawMinimap(ctx, g, vw - 196, 74, 182, 136);
-  // Mission banner, top-centre.
-  const banner = missionBanner(g);
-  ctx.font = 'bold 16px system-ui';
-  const bw = ctx.measureText(banner).width + 30;
-  ctx.fillStyle = 'rgba(10,10,18,0.6)'; ctx.beginPath(); ctx.roundRect((vw - bw) / 2, 12, bw, 32, 8); ctx.fill();
-  ctx.fillStyle = '#ffd23f'; ctx.textAlign = 'center'; ctx.fillText(banner, vw / 2, 34); ctx.textAlign = 'left';
-  // Phone message.
-  if (g.phone && g.time < g.phone.until) {
-    const w = 330, x = 14, y = vh - 108;
-    ctx.fillStyle = 'rgba(12,14,22,0.88)'; ctx.beginPath(); ctx.roundRect(x, y, w, 86, 12); ctx.fill();
-    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 12px system-ui'; ctx.fillText('📱 ' + g.phone.from, x + 14, y + 22);
-    ctx.fillStyle = '#f3f4f6'; ctx.font = '14px system-ui';
-    wrapText(ctx, g.phone.text, x + 14, y + 44, w - 28, 18);
-  }
-  // Speed + controls hint.
-  if (g.player.car) {
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 24px system-ui'; ctx.textAlign = 'right';
-    ctx.fillText(Math.round(Math.abs(g.player.car.speed) * 0.36) + ' km/h', vw - 20, vh - 20);
-    ctx.font = '12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.fillText('E exit · WASD drive', vw - 20, vh - 44); ctx.textAlign = 'left';
-  } else if (g.screen === 'play') {
-    ctx.font = '12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('WASD move · Shift sprint · E enter car · Click punch/shoot · H/M/P in menus', 16, vh - 14);
-  }
-  // Busted meter.
-  if (g.busted > 0.02) {
-    ctx.fillStyle = 'rgba(10,10,18,0.65)'; ctx.beginPath(); ctx.roundRect(vw / 2 - 130, vh / 2 - 90, 260, 44, 8); ctx.fill();
-    ctx.fillStyle = '#f87171'; ctx.font = 'bold 17px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('BUSTED?', vw / 2, vh / 2 - 64);
-    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(vw / 2 - 110, vh / 2 - 58, 220, 8);
-    ctx.fillStyle = '#f87171'; ctx.fillRect(vw / 2 - 110, vh / 2 - 58, 220 * g.busted, 8);
-    ctx.textAlign = 'left';
-  }
-  if (g.cityOwned) {
-    ctx.fillStyle = 'rgba(255,210,63,0.9)'; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('★ SOLMARA IS YOURS ★', vw / 2, 66); ctx.textAlign = 'left';
-  }
-}
-function wrapText(ctx, text, x, y, maxW, lh) {
-  const words = text.split(' '); let line = '', yy = y;
-  for (const w of words) {
-    if (ctx.measureText(line + w).width > maxW && line) { ctx.fillText(line, x, yy); line = ''; yy += lh; }
-    line += w + ' ';
-  }
-  ctx.fillText(line, x, yy);
+  return H;
 }
