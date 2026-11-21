@@ -1,61 +1,20 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+// Solmara Heat — tuning constants and palette for the whole game.
+export const WORLD_W = 2400;
+export const WORLD_H = 1800;
+export const ROAD_HALF = 58;            // half width of every road
+export const VX = [170, 570, 970, 1370, 1770, 2170]; // vertical road centre lines
+export const HY = [170, 550, 930, 1310];             // horizontal road centre lines
+export const BEACH_Y = 1500;             // sand starts here
+export const SEA_Y = 1650;               // open water starts here
+export const PLAYER_SPEED = 150;
+export const PLAYER_SPRINT = 235;
+export const CAR_TOP = 430;
+export const CAR_REVERSE = 130;
+export const COP_TOP = 400;
+export const SAVE_KEY = 'solmara-heat-save-v1';
+export const COLORS = {
+  asphalt: '#3c3f4a', lane: '#f7d774', sidewalk: '#9aa0a8', block: '#565064',
+  sand: '#ecd28f', sea: '#1f7f9e', seaDeep: '#166a8c',
+  player: '#ffd23f', neon: ['#ff5d8f', '#22d3ee', '#facc15', '#a3e635', '#f472b6', '#38bdf8'],
+  carPaint: ['#e74c3c', '#3498db', '#f39c12', '#9b59b6', '#1abc9c', '#ecf0f1', '#e67e22', '#95a5a6'],
 };
-
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
-};
-
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
-};
-
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
