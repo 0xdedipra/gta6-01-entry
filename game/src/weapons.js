@@ -107,6 +107,19 @@ export function createWeapons(scene, player, city) {
     grp.position.copy(spot); scene.add(grp);
     pickups.push({ kind: 'health', mesh: grp, active: true, respawnT: 0, baseY: 0 });
   }
+  // body armour, handed out at the clinic: a steel-blue vest on a stand
+  {
+    const grp = new THREE.Group();
+    const vest = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.9, 1.5),
+      new THREE.MeshLambertMaterial({ color: 0x3a6ea8 }));
+    vest.position.y = 1.7; grp.add(vest);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 1.6),
+      new THREE.MeshBasicMaterial({ color: 0xffd94d }));
+    band.position.y = 2.1; grp.add(band);
+    grp.position.copy(city.clinicPos).add(new THREE.Vector3(-13, 0, 6));
+    scene.add(grp);
+    pickups.push({ kind: 'armour', mesh: grp, active: true, respawnT: 0, baseY: 0 });
+  }
 
   const W = {
     state, current: 'pistol', cooldown: 0, reloadT: 0, pickups,
@@ -216,6 +229,10 @@ export function createWeapons(scene, player, city) {
             G.player.health = Math.min(100, G.player.health + 50);
             G.toast('+50 HEALTH'); pickupSound();
             pk.active = false; pk.mesh.visible = false; pk.respawnT = 50;
+          } else if (pk.kind === 'armour' && G.player.armour < 50) {
+            G.player.armour = 50;
+            G.toast('ARMOUR UP — 50'); pickupSound();
+            pk.active = false; pk.mesh.visible = false; pk.respawnT = 45;
           }
         }
       }

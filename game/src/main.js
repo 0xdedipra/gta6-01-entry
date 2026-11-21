@@ -40,11 +40,12 @@ const hud = createHud();
 
 const G = {
   scene, camera, city, player, peds, vehicles, police, weapons, missions, hud,
-  state: 'title', cash: 250, time: 0, camYaw: 0, shake: 0,
+  state: 'title', cash: 250, rp: 0, time: 0, camYaw: 0, shake: 0,
   danger: { x: 0, z: 0, t: -99 },
   mouseDown: false, mouseClicked: false, rightDown: false, wheelDelta: 0,
   lastShotCrime: -99, lastCopCrime: -99,
   addCash(n) { G.cash = Math.max(0, G.cash + n); },
+  addRP(n) { G.rp += n; },
   toast(msg) { hud.toast(msg); },
   onCrime(kind, pos) {
     if (kind === 'theft') {
@@ -114,24 +115,27 @@ hud.onWasted = () => { G.addCash(-0); respawnAtClinic(); };
 
 // --- deterministic staging for screenshots ---------------------------------
 if (SHOT === 'arsenal') {
+  // staged so Raka's back is to the camera, SMG raised toward the trouble:
+  // a burning wreck and two police cars to the SOUTH, beach and sea beyond
   G.state = 'playing'; hud.hideScreens();
-  player.pos.set(100, 0, 216);
-  player.angle = Math.PI; G.camYaw = 0;
+  player.pos.set(100, 0, 150);
+  player.angle = 0; G.camYaw = Math.PI;
+  G.rp = 850; // mid-ladder rank for the cover HUD
+  player.armour = 50;
   weapons.state.smg.unlocked = true;
   weapons.select('smg');
   police.setWanted(3, G);
-  // a smoking wreck ahead, and two police cars rolling in toward the player
   const wreck = vehicles.cars.find((c) => c.kind === 'parked' && !c.isGold) || vehicles.cars[0];
-  wreck.mesh.position.set(103, 0, 184); wreck.mesh.rotation.y = 0.6; wreck.angle = 0.6;
+  wreck.mesh.position.set(96, 0, 186); wreck.mesh.rotation.y = 0.6; wreck.angle = 0.6;
   vehicles.damageCar(wreck, 100); // fully burning: a thick dark smoke column
   G.forceAim = true;
-  const spots = [[90, 166], [113, 156]];
+  const spots = [[88, 214], [114, 206]];
   police.cars.forEach((c, i) => {
     if (i > 1) return;
     c.active = true;
     c.car.mesh.visible = true;
     c.car.mesh.position.set(spots[i][0], 0, spots[i][1]);
-    c.car.angle = Math.PI; c.car.mesh.rotation.y = Math.PI;
+    c.car.angle = 0; c.car.mesh.rotation.y = 0;
     c.car.speed = 10;
   });
 } else if (SHOT === 'drive') {
@@ -153,6 +157,20 @@ if (SHOT === 'arsenal') {
 } else if (SHOT === 'title') {
   G.state = 'title';
   player.pos.set(100, 0, 250);
+} else if (SHOT === 'map') {
+  // the pause screen's big island map, staged over central Solmara
+  G.state = 'paused';
+  player.pos.set(100, 0, 110);
+  player.angle = Math.PI; G.camYaw = 0;
+  G.rp = 850;
+  police.setWanted(2, G);
+  police.cars.forEach((c, i) => {
+    if (i > 1) return;
+    c.active = true;
+    c.car.mesh.visible = true;
+    c.car.mesh.position.set(40 + i * 46, 0, 40 + i * 30);
+  });
+  hud.show('scr-pause');
 }
 
 // --- camera ------------------------------------------------------------------
@@ -187,6 +205,13 @@ function updateCamera(dt) {
 
 // --- main loop -----------------------------------------------------------------
 const clock = new THREE.Clock();
+const DAY_BG = new THREE.Color(0x9fd4e8), DUSK_BG = new THREE.Color(0xe88a54);
+function updateSky(dt) {
+  // the title screen bathes the island in sunset; play returns it to day
+  const want = G.state === 'title' ? DUSK_BG : DAY_BG;
+  scene.background.lerp(want, Math.min(1, dt * 1.6));
+  scene.fog.color.copy(scene.background);
+}
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, clock.getDelta());
@@ -231,6 +256,7 @@ function frame() {
     vehicles.update(dt, G);
   }
   city.update(dt);
+  updateSky(dt);
   updateCamera(dt);
   hud.update(dt, G);
   renderer.render(scene, camera);

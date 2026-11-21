@@ -1,6 +1,8 @@
-// city.js — Solmara, built procedurally: a 6x4 road grid, ~35 blocks of
-// pastel buildings with lit-window canvas textures, a park, a gas station, a
-// garage, a clinic, and a beach with animated sea and palms along the south.
+// city.js — Solmara, the Isle of Ash, built procedurally: a volcanic island
+// with a 6x4 road grid, ~35 blocks of pastel buildings with lit-window canvas
+// textures and neon name signs, a park, a gas station, Mara's garage, a
+// clinic, a ferry dock on the south beach, and Kala's volcano smoking over
+// the ash fields at the north end. Water surrounds all four sides.
 // Exports the AABB collider list and a circle-vs-AABB resolver every mover uses.
 export const VX = [-500, -300, -100, 100, 300, 500]; // vertical roads (run along z)
 export const HZ = [-330, -110, 110, 330];           // horizontal roads (run along x)
@@ -129,6 +131,81 @@ export function buildCity(scene, seed = 7) {
   sea.rotation.x = -Math.PI / 2; sea.position.set(0, 0.04, SEA_Z + 100);
   scene.add(sea);
 
+  // --- the island sits in open water on ALL four sides: one huge sea plane
+  // runs underneath everything and out to the horizon.
+  const ocean = new THREE.Mesh(new THREE.PlaneGeometry(5200, 5200),
+    new THREE.MeshLambertMaterial({ color: 0x2b96bd }));
+  ocean.rotation.x = -Math.PI / 2; ocean.position.set(0, -0.08, 80);
+  scene.add(ocean);
+
+  // --- VOLCANO KALA at the north end: dark cone, glowing crater, slow smoke
+  const volcano = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(190, 230, 24),
+    new THREE.MeshLambertMaterial({ color: 0x4a4038 }));
+  cone.position.y = 115; volcano.add(cone);
+  const crater = new THREE.Mesh(new THREE.CircleGeometry(46, 24),
+    new THREE.MeshBasicMaterial({ color: 0xff6a22 }));
+  crater.rotation.x = -Math.PI / 2; crater.position.y = 218; volcano.add(crater);
+  const lavaLight = new THREE.PointLight(0xff7a30, 1.1, 420);
+  lavaLight.position.y = 240; volcano.add(lavaLight);
+  volcano.position.set(-60, 0, -760);
+  scene.add(volcano);
+  // smoke: soft sprites that rise, swell and loop over the crater
+  const smokeTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d');
+    const grad = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+    grad.addColorStop(0, 'rgba(210,205,200,0.55)');
+    grad.addColorStop(1, 'rgba(210,205,200,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  })();
+  const puffs = [];
+  for (let i = 0; i < 14; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false }));
+    s.userData.ph = i / 14;
+    scene.add(s); puffs.push(s);
+  }
+  // ash rocks scattered over the far-north fields and the volcano's skirts
+  const rockMat = new THREE.MeshLambertMaterial({ color: 0x3d362f });
+  for (let i = 0; i < 16; i++) {
+    const r = 2 + rng() * 4.5;
+    const rock = new THREE.Mesh(new THREE.ConeGeometry(r, r * 1.7, 5), rockMat);
+    const north = i < 10;
+    rock.position.set(-620 + rng() * 1240, r * 0.8, north ? -486 + rng() * 120 : -640 + rng() * 90);
+    rock.rotation.y = rng() * 3;
+    scene.add(rock);
+    if (north) colliders.push({ x0: rock.position.x - r, x1: rock.position.x + r, z0: rock.position.z - r, z1: rock.position.z + r });
+  }
+
+  // --- FERRY + dock pier at Pelabuhan, on the south beach
+  const dock = new THREE.Group();
+  const plankMat = new THREE.MeshLambertMaterial({ color: 0x8a6844 });
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(12, 1.4, 92), plankMat);
+  pier.position.set(100, 0.7, 686); dock.add(pier);
+  for (let i = 0; i < 5; i++) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 5, 6), plankMat);
+    post.position.set(95, -0.6, 652 + i * 20); dock.add(post);
+    const post2 = post.clone(); post2.position.x = 105; dock.add(post2);
+  }
+  scene.add(dock);
+  const ferry = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(30, 6, 15),
+    new THREE.MeshLambertMaterial({ color: 0xf0f0ea }));
+  hull.position.y = 2.2; ferry.add(hull);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(30.4, 1.6, 15.4),
+    new THREE.MeshLambertMaterial({ color: 0xe85454 }));
+  stripe.position.y = 3.4; ferry.add(stripe);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(16, 5, 10),
+    new THREE.MeshLambertMaterial({ color: 0xdfe8ee }));
+  cabin.position.y = 7.6; ferry.add(cabin);
+  const funnel = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.7, 5, 8),
+    new THREE.MeshLambertMaterial({ color: 0x2b2f36 }));
+  funnel.position.set(-5, 12, 0); ferry.add(funnel);
+  ferry.position.set(100, 0, 752);
+  scene.add(ferry);
+  colliders.push({ x0: 82, x1: 118, z0: 742, z1: 762 });
+
   // --- blocks
   const xCols = [[-619, -519], [-481, -319], [-281, -119], [-81, 81], [119, 281], [319, 481], [519, 619]];
   const zRows = [[-460, -349], [-291, -129], [-91, 91], [129, 291], [349, 460]];
@@ -220,7 +297,7 @@ export function buildCity(scene, seed = 7) {
       const isGarage = kind === 'garage';
       addBuilding(cx, cz, w - 34, d - 40, 13, isGarage ? texPool[6] : texPool[2]);
       addSign(cx, 14.5, cz - (d - 40) / 2 - 0.3, Math.PI,
-        isGarage ? 'GARAGE' : 'CLINIC +', isGarage ? '#20303c' : '#f4f6f8', isGarage ? '#ffd94d' : '#e23b3b');
+        isGarage ? "MARA'S GARAGE" : 'CLINIC +', isGarage ? '#20303c' : '#f4f6f8', isGarage ? '#ffd94d' : '#e23b3b');
       const pad = new THREE.Mesh(new THREE.BoxGeometry(30, 0.66, 22),
         new THREE.MeshLambertMaterial({ color: isGarage ? 0xffd94d : 0xf4f6f8 }));
       pad.position.set(cx, 0.33, z1 - 14); scene.add(pad);
@@ -230,7 +307,27 @@ export function buildCity(scene, seed = 7) {
   // palms along the beach and the southern boulevard
   for (let x = -600; x <= 620; x += 55) { addTree(x + rng() * 14, 486 + rng() * 26, true); if (rng() < 0.7) addTree(x + 26, 350 + 8, true); }
 
+  // neon name signs glowing on facades: the heights' hotel and the market
+  addSign(-200, 20, -141, 0, 'HOTEL KALA', '#140f24', '#ff7ae0');
+  addSign(-400, 17, 63, 0, 'PASAR SENJA', '#1c1030', '#ffb347');
+  addSign(200, 19, -335, 0, 'KOTA TUA', '#101c2c', '#7be495');
+
   let t = 0;
-  city.update = (dt) => { t += dt; stex.offset.x = Math.sin(t * 0.24) * 0.03; stex.offset.y = (t * 0.015) % 1; };
+  city.update = (dt) => {
+    t += dt;
+    stex.offset.x = Math.sin(t * 0.24) * 0.03; stex.offset.y = (t * 0.015) % 1;
+    // volcano smoke: each puff rises, swells, fades, then loops
+    for (const s of puffs) {
+      s.userData.ph = (s.userData.ph + dt * 0.045) % 1;
+      const ph = s.userData.ph;
+      s.position.set(-60 + Math.sin(ph * 9 + s.id) * 9 + ph * 26, 226 + ph * 120, -760 + ph * 10);
+      const sc = 26 + ph * 74;
+      s.scale.set(sc, sc, 1);
+      s.material.opacity = 0.5 * (1 - ph) * Math.min(1, ph * 6);
+    }
+    crater.material.color.setHSL(0.05, 0.95, 0.5 + Math.sin(t * 2.2) * 0.07);
+    ferry.position.y = Math.sin(t * 0.8) * 0.55;
+    ferry.rotation.z = Math.sin(t * 0.6) * 0.02;
+  };
   return city;
 }

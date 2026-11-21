@@ -61,14 +61,22 @@ export function buildCharacter({ shirt = 0x2ec4b6, pants = 0x33526e, skin = '#e8
 }
 
 export function createPlayer(scene) {
+  // Raka, the deckhand: he spawns on the Pelabuhan dock where the ferry
+  // dropped him, at the south end of the island.
   const c = buildCharacter({ shirt: 0xff5964, pants: 0x2e4057, skin: '#c68863' });
-  c.group.position.set(100, 0, 300);
+  c.group.position.set(100, 0, 452);
   scene.add(c.group);
   const p = {
-    char: c, group: c.group, health: 100, angle: Math.PI, walkPhase: 0,
+    char: c, group: c.group, health: 100, armour: 0, angle: Math.PI, walkPhase: 0,
     speedNow: 0, lastHurt: -99, inCar: null,
     get pos() { return c.group.position; },
-    hurt(n, t) { p.health = Math.max(0, p.health - n); p.lastHurt = t; },
+    hurt(n, t) {
+      // armour soaks damage first, plate by plate
+      const soaked = Math.min(p.armour, n);
+      p.armour -= soaked;
+      p.health = Math.max(0, p.health - (n - soaked));
+      p.lastHurt = t;
+    },
     update(dt, G) {
       if (p.inCar || G.state !== 'playing') { c.setWalk(0, 0); return; }
       const a = axis();
