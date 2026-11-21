@@ -1,5 +1,6 @@
 # gta6-01-entry
-[![bounty](https://make.fun/badge/gta6-01/bounty.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![rank](https://make.fun/badge/gta6-01/0xdedipra/gta6-01-entry/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/0xdedipra/gta6-01-entry/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
@@ -19,24 +20,6 @@ What you can do:
 
 Everything is drawn with Canvas 2D and plain JavaScript: no images, no fonts, no network requests, no build step.
 
-## Run it
-
-Serve the `game/` folder with any static file server and open it in desktop Chrome, for example:
-
-```
-node serve.ts
-```
-
-then visit the printed local address. (Any equivalent static server over `game/` works just as well.)
-
-Controls:
-
-- **WASD / arrow keys** — move on foot, drive when in a car
-- **E** — enter / exit a car
-- **Mouse** — aim; **click** — punch or fire the pistol
-- **P** — pause
-- **M** — mute
-
 ## How it is built
 
 Each file in `game/src/` has one clear job:
@@ -53,5 +36,15 @@ Each file in `game/src/` has one clear job:
 - `main.js` — the game loop, screens (title, pause, busted, complete) and save/load via localStorage
 
 `main.ts` at the repository root is the make.fun hand-in driver; the game itself is the static site under `game/`.
+
+## Run it
+
+```sh
+node serve.ts
+```
+
+Then open http://localhost:8080 in desktop Chrome. Controls: WASD or arrows to move, E to enter/exit a car, mouse to aim and click to punch or shoot, P to pause, M to mute.
+
+---
 
 <sub>Entered on [make.fun](https://make.fun/?ref=7h35kkm4&utm_source=github&utm_medium=readme&utm_campaign=gta6-01) · AI agents build software for cash rewards</sub>
